@@ -1,0 +1,160 @@
+# Basic256-Pong
+# Author: Topher Winward (@winwardo)
+# Date: 1st February 2015
+# License: MIT, please read LICENSE
+
+# ------------------------------------------------------------------
+
+# ---------------------------------
+# Constants
+
+escKey = 16777216
+frameDelay = 16 # 1/60
+screenHeight = 255
+screenWidth = 255
+
+global screenHeight, screenWidth
+
+# ---------------------------------
+# Global variable declarations
+
+lastKey = 0
+
+ball = {0, 0, 0, 0, 0} # x, y, xspeed, yspeed, radius
+paddle1 = {0, 128, 48, 20} # x, y, height, speed
+paddle2 = {255, 128, 48, 20} # x, y, height, speed
+scores = {0, 0} # Player 1, Player 2
+
+# ---------------------------------
+# Perform setup
+
+clg
+fastgraphics
+call resetBall(ref(ball))
+
+# ---------------------------------
+# Main game loop
+
+do
+	# Update input and timer
+	lastKey = key
+	timeLoopStart = msec
+
+	# Run main updates
+	call updatePaddles(lastKey, ref(paddle1), ref(paddle2))
+	call updateBall(ref(ball), ref(scores), ref(paddle1), ref(paddle2))
+	call drawAll(ref(ball), ref(paddle1), ref(paddle2), ref(scores))
+
+	# Sync to 60fps
+	while (msec - timeLoopStart) < frameDelay
+	end while
+
+until lastKey = escKey
+
+# ------------------------------------------------------------------
+
+# ---------------------------------
+
+subroutine resetBall(ref(ball))
+	ball = {128, 128, (rand * 4) - 2, (rand * 6) - 3, 5}
+end subroutine
+
+# ---------------------------------
+
+subroutine updateBall(ref(ball), ref(scores), ref(paddle1), ref(paddle2))
+	# Ball needs to speed up over time
+	ball[2] *= 1.005
+
+	ball[0] += ball[2] # Increase x by xspeed
+	ball[1] += ball[3] # Increase y by yspeed
+
+	### -- Perform collision detection
+
+	# Bounce against the paddles, and score
+	# Paddle 1 first
+	if (ball[0] < paddle1[0]) then
+		if (ball[1] > paddle1[1]) and (ball[1] < paddle1[1]+paddle1[2]) then # Bounce
+			ball[2] = -ball[2]
+		else # Player 2 scores
+			scores[1] += 1
+			call resetBall(ref(ball))
+		endif
+	endif
+
+	# Now paddle2
+	if (ball[0] > paddle2[0]) then
+		if (ball[1] > paddle2[1]) and (ball[1] < paddle2[1]+paddle2[2]) then # Bounce
+			ball[2] = -ball[2]
+		else # Player 1 scores
+			scores[0] += 1
+			call resetBall(ref(ball))
+		endif
+	endif
+ 
+
+	# Bounce against the top and bottom
+	if ball[1] > 256 then # Hit the bottom
+		ball[3] = -ball[3] # Reverse yspeed
+	endif
+	if ball[1] < 0 then # Hit the top
+		ball[3] = -ball[3] # Reverse yspeed
+	endif
+
+	# Ensure we don't get stuck outside the screen
+	ball[0] = clamp(ball[0], 0, screenWidth)
+	ball[1] = clamp(ball[1], 0, screenHeight)
+end subroutine
+
+# ---------------------------------
+
+subroutine updatePaddles(lastKey, ref(paddle1), ref(paddle2))
+	# Check Paddle1 first, controlled with W and S keys
+	paddle1_yMove = 0
+	if (87 = lastKey) then # W
+		paddle1_yMove = -paddle1[3]
+	endif
+	if (83 = lastKey) then # S
+		paddle1_yMove = paddle1[3]
+	endif
+
+	# Check Paddle2 next, controlled with up and down keys
+	paddle2_yMove = 0
+	if (16777235 = lastKey) then # Up
+		paddle2_yMove = -paddle2[3]
+	endif
+	if (16777237 = lastKey) then # Down
+		paddle2_yMove = paddle2[3]
+	endif
+
+	# Update the actual positions, and clamp to stay on the screen
+	paddle1[1] += paddle1_yMove
+	paddle1[1] = clamp(paddle1[1], 0, screenHeight - paddle1[2])
+
+	paddle2[1] += paddle2_yMove
+	paddle2[1] = clamp(paddle2[1], 0, screenHeight - paddle2[2])
+end subroutine
+
+# ---------------------------------
+
+subroutine drawAll(ref(ball), ref(paddle1), ref(paddle2), ref(scores))
+	clg
+	circle ball[0], ball[1], ball[4]
+	rect paddle1[0], paddle1[1], 5, paddle1[2]
+	rect paddle2[0]-5, paddle2[1], 5, paddle2[2]
+	text 0, 0, "P1: " + scores[0] + " P2: " + scores[1] 
+	refresh
+end subroutine
+
+# ---------------------------------
+
+function clamp(value, min, max)
+	if (value < min) then
+		return min
+	endif
+	if (value > max) then
+		return max
+	endif	
+	return value
+end function
+
+# ---------------------------------
